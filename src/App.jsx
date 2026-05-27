@@ -197,7 +197,7 @@ export default function WeightTrackerApp() {
       return {
         date: entry.date,
         rollingAverageWeight: Number(
-          averageWeight.toFixed(2)
+          averageWeight.toFixed(1)
         ),
       };
     });
@@ -242,7 +242,7 @@ export default function WeightTrackerApp() {
 
         return {
           week,
-          averageWeight: Number(averageWeight.toFixed(2)),
+          averageWeight: Number(averageWeight.toFixed(1)),
           averageCalories: Number(averageCalories.toFixed(0)),
         };
       });
@@ -260,7 +260,14 @@ export default function WeightTrackerApp() {
 
   const currentAverageCalories =
     weeklyAverages.length > 0
-      ? weeklyAverages[weeklyAverages.length - 1].averageCalories
+      ? weeklyAverages[weeklyAverages.length - 1]
+          .averageCalories
+      : null;
+
+  const previousAverageCalories =
+    weeklyAverages.length > 1
+      ? weeklyAverages[weeklyAverages.length - 2]
+          .averageCalories
       : null;
 
   const estimatedMaintenanceCalories = useMemo(() => {
@@ -317,6 +324,58 @@ export default function WeightTrackerApp() {
 
     return "Not Enough Data";
   }, [weeklyAverages]);
+
+  // =====================================
+  // WEEKLY HISTORY FEATURE
+  // =====================================
+
+  const getWeekNumber = (dateString) => {
+    const date = new Date(dateString);
+    const startOfYear = new Date(date.getFullYear(), 0, 1);
+
+    const days = Math.floor(
+      (date - startOfYear) / (24 * 60 * 60 * 1000)
+    );
+
+    return Math.ceil((days + startOfYear.getDay() + 1) / 7);
+  };
+
+  const groupedWeeklyHistory = {};
+
+  entries.forEach((entry) => {
+    const week = getWeekNumber(entry.date);
+    const year = new Date(entry.date).getFullYear();
+    const key = `${year}-W${week}`;
+
+    if (!groupedWeeklyHistory[key]) {
+      groupedWeeklyHistory[key] = [];
+    }
+
+    groupedWeeklyHistory[key].push(entry);
+  });
+
+  const weeklyHistory = Object.entries(groupedWeeklyHistory)
+    .map(([week, weekEntries]) => {
+      const averageWeight =
+        weekEntries.reduce(
+          (sum, entry) => sum + Number(entry.weight || 0),
+          0
+        ) / weekEntries.length;
+
+      const averageCalories =
+        weekEntries.reduce(
+          (sum, entry) => sum + Number(entry.calories || 0),
+          0
+        ) / weekEntries.length;
+
+      return {
+        week,
+        averageWeight: Number(averageWeight.toFixed(1)),
+        averageCalories: Math.round(averageCalories),
+        entryCount: weekEntries.length,
+      };
+    })
+    .sort((a, b) => a.week.localeCompare(b.week));
 
   let trend = "Maintaining";
 
@@ -379,12 +438,24 @@ export default function WeightTrackerApp() {
 
           <div className="bg-white rounded-3xl shadow-lg p-6">
             <p className="text-sm text-slate-500">
-              Weekly Average Calories
+              Current Weekly Average Calories
             </p>
 
             <h2 className="text-3xl font-bold mt-2 text-slate-800">
               {currentAverageCalories !== null
                 ? `${currentAverageCalories} kcal`
+                : "--"}
+            </h2>
+          </div>
+
+          <div className="bg-white rounded-3xl shadow-lg p-6">
+            <p className="text-sm text-slate-500">
+              Previous Weekly Average Calories
+            </p>
+
+            <h2 className="text-3xl font-bold mt-2 text-slate-800">
+              {previousAverageCalories !== null
+                ? `${previousAverageCalories} kcal`
                 : "--"}
             </h2>
           </div>
@@ -616,3 +687,83 @@ export default function WeightTrackerApp() {
     </div>
   );
 }
+
+
+/*
+=================================
+CREATE THESE FILES SEPARATELY
+=================================
+
+public/manifest.json
+
+{
+  "name": "Weight Tracker",
+  "short_name": "Tracker",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#f1f5f9",
+  "theme_color": "#0f172a",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
+
+---------------------------------
+public/sw.js
+---------------------------------
+
+const CACHE_NAME = "weight-tracker-cache-v1";
+
+const urlsToCache = [
+  "/",
+  "/index.html",
+];
+
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.addAll(urlsToCache);
+    })
+  );
+});
+
+self.addEventListener("fetch", (event) => {
+  event.respondWith(
+    caches.match(event.request).then((response) => {
+      return response || fetch(event.request);
+    })
+  );
+});
+
+---------------------------------
+src/main.jsx
+Add BELOW ReactDOM.createRoot
+---------------------------------
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js");
+  });
+}
+
+---------------------------------
+index.html
+Add inside <head>
+---------------------------------
+
+<link rel="manifest" href="/manifest.json" />
+<meta name="theme-color" content="#0f172a" />
+*/
+
+
+
