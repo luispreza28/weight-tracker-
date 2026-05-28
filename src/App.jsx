@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef, } from "react";
 import {
   LineChart,
   Line,
@@ -49,6 +49,7 @@ export default function WeightTrackerApp() {
     ];
   });
 
+  const editFormRef = useRef(null);
   const [date, setDate] = useState("");
   const [weight, setWeight] = useState("");
   const [calories, setCalories] = useState("");
@@ -107,6 +108,24 @@ export default function WeightTrackerApp() {
     setError("");
   };
 
+  const handleEdit = (entry) => {
+    setEditingId(entry.id);
+
+    setDate(entry.date);
+    setWeight(entry.weight);
+    setCalories(entry.calories);
+
+    // Wait for React render before scrolling
+    setTimeout(() => {
+      if (editFormRef.current) {
+        editFormRef.current.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      }
+    }, 300);
+  };
+  
   const updateEntry = () => {
     if (!date || !weight || !calories) {
       setError("Please enter a date, weight, and calories.");
@@ -247,6 +266,18 @@ export default function WeightTrackerApp() {
         };
       });
   }, [entries]);
+
+  // =====================================
+  // FINALIZED WEEK CHART DATA
+  // =====================================
+
+  const finalizedWeeklyAverages = useMemo(() => {
+    if (weeklyAverages.length <= 1) {
+      return [];
+    }
+
+    return weeklyAverages.slice(0, -1);
+  }, [weeklyAverages]);
 
   const currentAverageWeight =
     weeklyAverages.length > 0
@@ -564,7 +595,7 @@ export default function WeightTrackerApp() {
 
             <div className="h-[350px]">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={weeklyAverages}>
+                <LineChart data={finalizedWeeklyAverages}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="week" />
                   <YAxis domain={["auto", "auto"]} />
@@ -589,7 +620,7 @@ export default function WeightTrackerApp() {
 
             <div className="h-[350px]">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={weeklyAverages}>
+                <LineChart data={finalizedWeeklyAverages}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="week" />
                   <YAxis domain={["auto", "auto"]} />
@@ -608,7 +639,7 @@ export default function WeightTrackerApp() {
           </div>
         </div>
 
-        <div className="bg-white rounded-3xl shadow-lg p-6">
+        <div className="bg-white rounded-3xl shadow-lg p-6" ref={editFormRef}>
           <h2 className="text-2xl font-semibold text-slate-800 mb-4">
             Daily Entries
           </h2>
